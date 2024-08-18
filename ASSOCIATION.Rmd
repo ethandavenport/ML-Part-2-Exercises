@@ -1,0 +1,108 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+#Association Rules
+
+```{r, warning = FALSE, message = FALSE}
+
+library(readr)
+library(arules)
+library(arulesViz)
+library(dplyr)
+library(ggplot2)
+
+transactions <- read.transactions("/Users/samchen/Downloads/groceries.txt", 
+                                  format = "basket", sep = ",")
+
+summary(transactions)
+
+itemFrequencyPlot(transactions, topN = 20, type = "absolute")
+
+```
+
+Here is a basic frequency plot of the various different items that you can buy at the grocery store. As can be seen, there are items that take up a large proportion of the entire data set.
+
+```{r, warning = FALSE}
+
+rules <- apriori(transactions, parameter = list(supp = 0.001, conf = 0.1, 
+                                                maxlen = 5))
+
+```
+The minimum support count is 9, as in there has to be at least 9 connections in the data set between those two particular items for it to register.
+
+```{r, warning = FALSE}
+
+summary(rules)
+
+```
+
+Just from a basic summary, we can see that whole milk, other vegetables, rolls/buns, soda, and yogurt are the most represented/bought items in the data set. Since there are so many distinct items in the data set, it makes sense to just keep support threshold low at 0.1%.
+
+```{r, warning = FALSE}
+
+plot(rules, method = 'scatterplot', measure = c('support', 'lift'), 
+     shading = 'lift')
+
+```
+
+Interesting, as your support decreases, the lift seems to increase. Based on this relationship, we can see that the support threshold that we chose is pretty valid in the sense that we would be losing a lot of information if the support threshold was pushed higher. 
+
+```{r, warning = FALSE}
+#find out which rules have positive associations
+filtered_rules <- subset(rules, lift > 1)
+
+inspect(filtered_rules[1:10,])
+
+```
+
+Looking at the top rules or connections, yogurt, soda, bottled water, whole milk, and other basic essentials are bought a lot on their own. The lifts of these rows flat line at 1 as they are practically connected with themselves.. Outside of that there is a strong drop off in support to the other item pairs in the list. This makes sense because both need to be present for the pair to be listed. What is is interesting is that there is a high variability of unique pairs even when customers are buying groceries. There are actually 32415 unique one direction rules in the data set.
+
+**Thresholds that we choose.**
+
+**Support:** given the sheer number of unique combinations in the data set, a threshold above 0.001 would really isolate pretty much every rule except for the rules with lift of 1.
+
+**Lift:** We define lift of 18 as our threshold because wanted to see the top 0.1% (18 is around 99.9th percentile) of grocery item relationships.
+
+**Confidence:** Choosing confidence at 0.5 means that the conditional has to be at least 0.5 to show that there is a strong confidence in our inference.
+
+
+We think it also makes sense to look at which of these rules have the strongest lift. In this case, we will define high lift as lift > 8. Of the defined rules, we really want to see the rules that occupy the very top 0.1% of all rules to be concise.
+
+```{r, warning = FALSE}
+
+#find very strong lift rules
+filtered_rules_20 <- subset(rules, lift > 18)
+filtered_rules_20_df <- inspect(filtered_rules_20)
+filtered_rules_20_df
+
+```
+
+There are some very intuitive relationships represented in our high lift rule set. Buying beer and wine leads to buying liquor. Buying ham and processed cheese leads to buying bread, to make sandwiches. Buying a salty snack and soda leads to buying popcorn - for movies nights. High lift rules represent combos of items that are bought together specifically to pair with one another. Specifically, the practical interpretation of high lift rules is that there is a highly likelihood the right hand side of the rule is going to happen given the the presence of the left hand side of the rule.
+
+
+```{r, warning = FALSE}
+
+plot(filtered_rules_20, method = "paracoord", control = list(reorder = TRUE))
+
+```
+
+Here we have a parallel coordinate graph. This graph shows the likely relationships and positions of different item pairings. For example, in the data frame with lift > 18, soda is likely to be on the left hand side of hamburger meat and hamburger meat is also likely to be on the left hand side of instant food products. The strongest line represents the strongest connection of all - that being the basketed purchases of beer, wine, and liquor. All of these combinations make sense.
+
+
+```{r, warning = FALSE}
+
+filtered_rules_conf <- subset(rules,lift > 15 & confidence > 0.5)
+inspect(filtered_rules_conf)
+
+```
+
+Once we filter again for these relationships for a confidence of at least 0.5, we find the above to be the high lift and high confidence items pairs. The pairings make sense, and again are associated with paired items for specific dishes or activities. This time, sugar --> flour is replaced with baking power, flour --> sugar, the relationships seems to be more specific.
+
+Overall, the network we produced with the thresholds that we defined above worked well to some of the relationships with basic grocery item pairings as well as pairings from very specific grocery items. This shows that consumers tend to buy things in conjunction in order to satisfy certain experiences and needs that cannot be achieved with just one item.
+
+
+
+
